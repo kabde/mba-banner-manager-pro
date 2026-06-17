@@ -1,0 +1,347 @@
+<?php
+/**
+ * Classe pour gérer l'affichage des bannières sur le frontend
+ */
+class MBA_Banners_Frontend_Pro {
+
+	public function __construct() {
+		// Afficher la bannière header à la fin du header (wp_body_open) ET en fallback sur wp_head
+		add_action( 'wp_body_open', [ $this, 'display_header_banners' ] );
+		add_action( 'wp_head', [ $this, 'display_header_banners_fallback' ] );
+		// Afficher la bannière footer juste avant le footer (get_footer)
+		add_action( 'get_footer', [ $this, 'display_footer_banners' ] );
+		add_action( 'get_sidebar', [ $this, 'display_sidebar_banners' ] );
+		add_action( 'the_content', [ $this, 'display_in_article_banners' ] );
+		add_action( 'loop_end', [ $this, 'display_listing_banners' ] );
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_shortcode( 'mba_banner', [ $this, 'shortcode_banner' ] );
+		if ( isset( $_GET['debug_banners'] ) ) {
+			add_action( 'wp_head', [ $this, 'display_global_debug' ] );
+		}
+	}
+
+	/**
+	 * Afficher les bannières dans l'en-tête
+	 */
+	public function display_header_banners() {
+		static $already_displayed = false;
+		if ($already_displayed) return;
+		$already_displayed = true;
+
+		// Emplacement : header
+		$banners = $this->get_banners_for_location( 'header' );
+		if ( ! empty( $banners ) ) {
+			echo '<div class="mba-banner-container mba-header-banners">';
+			foreach ( $banners as $banner ) {
+				echo $this->render_banner( $banner );
+			}
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Afficher les bannières dans le pied de page
+	 */
+	public function display_footer_banners() {
+		// Emplacement : footer
+		$banners = $this->get_banners_for_location( 'footer' );
+		if ( ! empty( $banners ) ) {
+			echo '<div class="mba-banner-container mba-footer-banners">';
+			foreach ( $banners as $banner ) {
+				echo $this->render_banner( $banner );
+			}
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Afficher les bannières dans les sidebars
+	 */
+	public function display_sidebar_banners() {
+		// Emplacement : sidebar1
+		$banners1 = $this->get_banners_for_location( 'sidebar1' );
+		if ( ! empty( $banners1 ) ) {
+			echo '<div class="mba-banner-container mba-sidebar-banners mba-sidebar1-banners">';
+			foreach ( $banners1 as $banner ) {
+				echo $this->render_banner( $banner );
+			}
+			echo '</div>';
+		}
+		// Emplacement : sidebar2
+		$banners2 = $this->get_banners_for_location( 'sidebar2' );
+		if ( ! empty( $banners2 ) ) {
+			echo '<div class="mba-banner-container mba-sidebar-banners mba-sidebar2-banners">';
+			foreach ( $banners2 as $banner ) {
+				echo $this->render_banner( $banner );
+			}
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Afficher les bannières dans les articles
+	 */
+	public function display_in_article_banners( $content ) {
+		// Emplacement : in_article
+		if ( is_single() && in_the_loop() ) {
+			$banners = $this->get_banners_for_location( 'in_article' );
+			if ( ! empty( $banners ) ) {
+				$banner_html = '<div class="mba-banner-container mba-in-article-banners">';
+				foreach ( $banners as $banner ) {
+					$banner_html .= $this->render_banner( $banner );
+				}
+				$banner_html .= '</div>';
+				// Insérer après le premier paragraphe non vide
+				$content = $this->insert_banner_in_content( $content, $banner_html );
+			}
+		}
+		return $content;
+	}
+
+	/**
+	 * Afficher les bannières entre les articles dans les listes
+	 */
+	public function display_listing_banners() {
+		// Emplacement : in_listing
+		if ( is_home() || is_archive() || is_search() ) {
+			$banners = $this->get_banners_for_location( 'in_listing' );
+			if ( ! empty( $banners ) ) {
+				echo '<div class="mba-banner-container mba-listing-banners">';
+				foreach ( $banners as $banner ) {
+					echo $this->render_banner( $banner );
+				}
+				echo '</div>';
+			}
+		}
+	}
+
+	/**
+	 * Récupérer les bannières pour un emplacement donné
+	 */
+	private function get_banners_for_location( $locations ) {
+		$locations = (array) $locations;
+		$device = wp_is_mobile() ? 'mobile' : 'desktop';
+
+		// Récupérer toutes les bannières actives et device compatible
+		$banners = get_posts([
+			'post_type' => 'mbabanners',
+			'post_status' => 'publish',
+			'posts_per_page' => -1,
+			'meta_query' => [
+				[
+					'key' => '_mba_status',
+					'value' => 'active',
+					'compare' => '='
+				],
+				[
+					'relation' => 'OR',
+					[
+						'key' => '_mba_device',
+						'value' => 'both',
+						'compare' => '='
+					],
+					[
+						'key' => '_mba_device',
+						'value' => $device,
+						'compare' => '='
+					]
+				]
+			]
+		]);
+
+		// Filtrer en PHP sur les emplacements
+		$filtered = [];
+		foreach ($banners as $banner) {
+			$positions = get_post_meta($banner->ID, '_mba_positions', true);
+			if (is_array($positions) && array_intersect($locations, $positions)) {
+				$filtered[] = $banner;
+			}
+		}
+		return $filtered;
+	}
+
+	/**
+	 * Rendre une bannière
+	 */
+	private function render_banner( $banner ) {
+		$type = get_post_meta( $banner->ID, '_mba_type', true );
+		$dimensions = get_post_meta( $banner->ID, '_mba_dimensions', true );
+		$html = '<div class="mba-banner mba-banner-' . esc_attr( $type ) . '" data-banner-id="' . esc_attr( $banner->ID ) . '">';
+		if ( $type === 'image' ) {
+			$html .= $this->render_image_banner( $banner );
+		} else {
+			$html .= $this->render_html_banner( $banner );
+		}
+		$html .= '</div>';
+		return $html;
+	}
+
+	/**
+	 * Rendre une bannière image
+	 */
+	private function render_image_banner( $banner ) {
+		$image_id = get_post_meta( $banner->ID, '_mba_image_id', true );
+		$image_link = get_post_meta( $banner->ID, '_mba_image_link', true );
+		$dimensions = get_post_meta( $banner->ID, '_mba_dimensions', true );
+		
+		if ( ! $image_id ) {
+			return '';
+		}
+
+		// Déterminer les dimensions
+		$width = '';
+		$height = '';
+		$style = '';
+		
+		if ( $dimensions === 'custom' ) {
+			$width = get_post_meta( $banner->ID, '_mba_custom_width', true );
+			$height = get_post_meta( $banner->ID, '_mba_custom_height', true );
+		} elseif ( ! empty( $dimensions ) ) {
+			list( $width, $height ) = explode( 'x', $dimensions );
+		}
+
+		if ( $width && $height ) {
+			$style = 'width: ' . intval( $width ) . 'px; height: ' . intval( $height ) . 'px;';
+		}
+
+		$image_html = wp_get_attachment_image( $image_id, 'full', false, [ 'style' => $style ] );
+		if ( ! $image_html ) {
+			return '';
+		}
+		
+		if ( $image_link ) {
+			return '<a href="' . esc_url( $image_link ) . '" target="_blank" rel="nofollow sponsored noopener">' . $image_html . '</a>';
+		} else {
+			return $image_html;
+		}
+	}
+
+	/**
+	 * Rendre une bannière HTML/JS
+	 */
+	private function render_html_banner( $banner ) {
+		$html_code = get_post_meta( $banner->ID, '_mba_html', true );
+		
+		if ( empty( $html_code ) ) {
+			return '';
+		}
+
+		return '<div class="mba-html-banner">' . $html_code . '</div>';
+	}
+
+	/**
+	 * Insérer une bannière dans le contenu d'un article
+	 */
+	private function insert_banner_in_content( $content, $banner_html ) {
+		// Diviser le contenu en paragraphes
+		$paragraphs = explode( '</p>', $content );
+		
+		// Insérer après le premier paragraphe non vide
+		$inserted = false;
+		foreach ( $paragraphs as $key => $paragraph ) {
+			if ( ! $inserted && ! empty( trim( strip_tags( $paragraph ) ) ) ) {
+				$paragraphs[ $key ] = $paragraph . '</p>' . $banner_html;
+				$inserted = true;
+				break;
+			}
+		}
+		
+		return implode( '</p>', $paragraphs );
+	}
+
+	/**
+	 * Shortcode pour afficher une bannière manuellement
+	 */
+	public function shortcode_banner( $atts ) {
+		$atts = shortcode_atts( [
+			'location' => 'header',
+			'limit' => 1
+		], $atts, 'mba_banner' );
+
+		$allowed_locations = [ 'header', 'footer', 'sidebar1', 'sidebar2', 'in_article', 'in_listing' ];
+		$location = sanitize_key( $atts['location'] );
+		if ( ! in_array( $location, $allowed_locations, true ) ) {
+			return '';
+		}
+
+		$banners = $this->get_banners_for_location( $location );
+		
+		if ( empty( $banners ) ) {
+			return '';
+		}
+
+		// Limiter le nombre de bannières
+		$limit = max( 1, min( 20, absint( $atts['limit'] ) ) );
+		$banners = array_slice( $banners, 0, $limit );
+
+		$html = '<div class="mba-banner-container mba-shortcode-banners">';
+		foreach ( $banners as $banner ) {
+			$html .= $this->render_banner( $banner );
+		}
+		$html .= '</div>';
+
+		return $html;
+	}
+
+	/**
+	 * Afficher le debug global
+	 */
+	public function display_global_debug() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$all_banners = get_posts( [
+			'post_type' => 'mbabanners',
+			'post_status' => 'publish',
+			'posts_per_page' => -1
+		] );
+		echo '<div style="background: #0073aa; color: white; padding: 15px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 13px; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; max-height: 350px; overflow-y: auto;">';
+		echo '<strong>MBA DEBUG - Liste des bannières (' . count( $all_banners ) . ')</strong><br><br>';
+		if ( ! empty( $all_banners ) ) {
+			foreach ( $all_banners as $banner ) {
+				$status = get_post_meta( $banner->ID, '_mba_status', true );
+				$type = get_post_meta( $banner->ID, '_mba_type', true );
+				$positions = get_post_meta( $banner->ID, '_mba_positions', true );
+				$device = get_post_meta( $banner->ID, '_mba_device', true );
+				$image_id = get_post_meta( $banner->ID, '_mba_image_id', true );
+				$html_code = get_post_meta( $banner->ID, '_mba_html', true );
+				echo '<strong>ID ' . $banner->ID . ':</strong> ' . esc_html($banner->post_title) . '<br>';
+				echo '- Statut: ' . esc_html($status) . ' | Type: ' . esc_html($type) . ' | Device: ' . esc_html($device) . '<br>';
+				echo '- Positions: ' . esc_html( is_array($positions) ? implode(", ", $positions) : $positions ) . '<br>';
+				if ( $type === 'image' ) {
+					echo '- Image ID: ' . esc_html($image_id) . '<br>';
+				} else {
+					echo '- HTML Code: ' . ( ! empty( $html_code ) ? 'Présent (' . strlen( $html_code ) . ' chars)' : 'Vide' ) . '<br>';
+				}
+				echo '<br>';
+			}
+		} else {
+			echo 'Aucune bannière trouvée.';
+		}
+		echo '</div>';
+	}
+
+	/**
+	 * Charger les assets CSS/JS
+	 */
+	public function enqueue_assets() {
+		wp_enqueue_style(
+			'mba-banners-frontend',
+			MBA_BANNERS_PRO_URL . 'admin/css/mba-banners-frontend.css',
+			[],
+			MBA_BANNERS_PRO_VERSION
+		);
+	}
+
+	/**
+	 * Afficher la bannière header uniquement si elle n'a pas déjà été affichée (évite le doublon)
+	 */
+	public function display_header_banners_fallback() {
+		static $already_displayed = false;
+		if ( ! $already_displayed ) {
+			$this->display_header_banners();
+			$already_displayed = true;
+		}
+	}
+} 
