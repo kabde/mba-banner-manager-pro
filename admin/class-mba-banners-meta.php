@@ -12,6 +12,7 @@ class MBA_Banners_Meta_Pro {
 		add_action( 'add_meta_boxes', [ $this, 'add_boxes' ] );
 		add_action( 'save_post_mbabanners', [ $this, 'save' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'assets' ] );
+		add_action( 'admin_notices', [ $this, 'admin_notices' ] );
 	}
 
 	/* --------- 1. Métabox --------- */
@@ -31,7 +32,6 @@ class MBA_Banners_Meta_Pro {
 	}
 
 	public function render_box( $post ) {
-		// valeurs existantes
 		$type      = get_post_meta( $post->ID, '_mba_type',      true ) ?: 'image';
 		$image_id  = get_post_meta( $post->ID, '_mba_image_id',  true );
 		$html_code = get_post_meta( $post->ID, '_mba_html',      true );
@@ -39,130 +39,260 @@ class MBA_Banners_Meta_Pro {
 		$device    = get_post_meta( $post->ID, '_mba_device',    true ) ?: 'both';
 		$dimensions = get_post_meta( $post->ID, '_mba_dimensions', true ) ?: '';
 		$status    = get_post_meta( $post->ID, '_mba_status',    true ) ?: 'active';
+		$image_link = get_post_meta( $post->ID, '_mba_image_link', true );
+		$warnings = $this->get_configuration_warnings( $post->ID );
 
 		wp_nonce_field( 'mba_save_banner', 'mba_banner_nonce' );
 		?>
-		<p>
-			<strong>Statut</strong><br>
-			<label><input type="radio" name="mba_status" value="active" <?php checked( $status, 'active' ); ?>/> Actif</label>
-			<label><input type="radio" name="mba_status" value="inactive" <?php checked( $status, 'inactive' ); ?>/> Inactif</label>
-		</p>
+		<?php if ( $warnings ) : ?>
+			<div class="notice notice-warning inline mba-config-warning">
+				<p><strong><?php esc_html_e( 'Configuration à compléter', 'mba-banner-manager' ); ?></strong></p>
+				<ul>
+					<?php foreach ( $warnings as $warning ) : ?>
+						<li><?php echo esc_html( $warning ); ?></li>
+					<?php endforeach; ?>
+				</ul>
+			</div>
+		<?php endif; ?>
 
-		<p>
-			<strong>Type de bannière</strong><br>
-			<label><input type="radio" name="mba_type" value="image" <?php checked( $type, 'image' ); ?>/> Image</label>
-			<label><input type="radio" name="mba_type" value="html"  <?php checked( $type, 'html'  ); ?>/> HTML/JS</label>
-		</p>
+		<div class="mba-admin-layout">
+			<div class="mba-admin-main">
+				<section class="mba-admin-section">
+					<h3><?php esc_html_e( 'Status', 'mba-banner-manager' ); ?></h3>
+					<div class="mba-field-grid">
+						<label><input type="radio" name="mba_status" value="active" <?php checked( $status, 'active' ); ?>/> <?php esc_html_e( 'Actif', 'mba-banner-manager' ); ?></label>
+						<label><input type="radio" name="mba_status" value="inactive" <?php checked( $status, 'inactive' ); ?>/> <?php esc_html_e( 'Inactif', 'mba-banner-manager' ); ?></label>
+					</div>
+				</section>
 
-		<div id="mba-image-fields" style="<?php echo ( $type === 'image' ) ? '' : 'display:none'; ?>">
-			<p>
-				<input type="hidden" name="mba_image_id" id="mba_image_id" value="<?php echo esc_attr( $image_id ); ?>">
-				<button type="button" class="button" id="mba_pick_image">Choisir une image</button>
-				<span id="mba_image_preview">
-					<?php if ( $image_id ) echo wp_get_attachment_image( $image_id, [ 150, 150 ] ); ?>
-				</span>
-			</p>
-			<p><label>Lien cible :<br>
-				<input type="url" name="mba_image_link" style="width:100%" value="<?php echo esc_attr( get_post_meta( $post->ID, '_mba_image_link', true ) ); ?>">
-			</label></p>
-		</div>
+				<section class="mba-admin-section">
+					<h3><?php esc_html_e( 'Creative', 'mba-banner-manager' ); ?></h3>
+					<div class="mba-field-grid">
+						<label><input type="radio" name="mba_type" value="image" <?php checked( $type, 'image' ); ?>/> <?php esc_html_e( 'Image', 'mba-banner-manager' ); ?></label>
+						<label><input type="radio" name="mba_type" value="html" <?php checked( $type, 'html' ); ?>/> <?php esc_html_e( 'HTML/JS', 'mba-banner-manager' ); ?></label>
+					</div>
 
-		<div id="mba-html-fields" style="<?php echo ( $type === 'html' ) ? '' : 'display:none'; ?>">
-			<p><label>Code HTML / JavaScript à insérer :<br>
-				<textarea name="mba_html" rows="10" style="width:100%; font-family: 'Courier New', monospace; font-size: 12px;" placeholder="Insérez votre code HTML, JavaScript, ou bannière publicitaire ici..."><?php echo esc_textarea( $html_code ); ?></textarea>
-			</label></p>
-			<p style="color: #666; font-style: italic;">
-				💡 <strong>Conseils :</strong> Vous pouvez insérer du code HTML, JavaScript, ou des bannières publicitaires (Google AdSense, etc.). 
-				Le code sera inséré tel quel dans votre site.
-			</p>
-		</div>
+					<div id="mba-image-fields" style="<?php echo ( $type === 'image' ) ? '' : 'display:none'; ?>">
+						<input type="hidden" name="mba_image_id" id="mba_image_id" value="<?php echo esc_attr( $image_id ); ?>">
+						<p>
+							<button type="button" class="button" id="mba_pick_image"><?php esc_html_e( 'Choisir une image', 'mba-banner-manager' ); ?></button>
+							<span id="mba_image_preview">
+								<?php if ( $image_id ) echo wp_get_attachment_image( $image_id, [ 150, 150 ] ); ?>
+							</span>
+						</p>
+						<p class="description mba-empty-state" id="mba-image-empty" <?php echo $image_id ? 'style="display:none;"' : ''; ?>><?php esc_html_e( 'Aucune image sélectionnée.', 'mba-banner-manager' ); ?></p>
+						<p><label><?php esc_html_e( 'Lien cible', 'mba-banner-manager' ); ?><br>
+							<input type="url" name="mba_image_link" id="mba_image_link" style="width:100%" value="<?php echo esc_attr( $image_link ); ?>">
+						</label></p>
+						<p class="description mba-empty-state" id="mba-link-empty" <?php echo $image_link ? 'style="display:none;"' : ''; ?>><?php esc_html_e( 'Aucun lien cible configuré.', 'mba-banner-manager' ); ?></p>
+					</div>
 
-		<div id="mba-dimensions-section" style="<?php echo ( $type === 'html' ) ? 'display:none;' : ''; ?>">
-			<hr>
+					<div id="mba-html-fields" style="<?php echo ( $type === 'html' ) ? '' : 'display:none'; ?>">
+						<p><label><?php esc_html_e( 'Code HTML / JavaScript à insérer', 'mba-banner-manager' ); ?><br>
+							<textarea name="mba_html" id="mba_html" rows="10" style="width:100%; font-family: monospace; font-size: 12px;" placeholder="<?php esc_attr_e( 'Insérez votre code HTML, JavaScript, ou bannière publicitaire ici...', 'mba-banner-manager' ); ?>"><?php echo esc_textarea( $html_code ); ?></textarea>
+						</label></p>
+						<p class="description"><?php esc_html_e( 'Le code HTML/JS doit être réservé aux administrateurs de confiance.', 'mba-banner-manager' ); ?></p>
+					</div>
+				</section>
 
-			<p><strong>Format de la bannière</strong><br>
-				<select name="mba_dimensions" id="mba_dimensions_select" style="width:100%;">
-					<option value="">Sélectionner un format</option>
-					<optgroup label="Bannières horizontales (Header/Footer/Listing)">
-						<option value="728x90" <?php selected( $dimensions, '728x90' ); ?>>Bannière horizontale standard (728×90)</option>
-						<option value="970x90" <?php selected( $dimensions, '970x90' ); ?>>Bannière horizontale large (970×90)</option>
-						<option value="970x250" <?php selected( $dimensions, '970x250' ); ?>>Bannière horizontale grande (970×250)</option>
-						<option value="468x60" <?php selected( $dimensions, '468x60' ); ?>>Bannière horizontale petite (468×60)</option>
-						<option value="320x50" <?php selected( $dimensions, '320x50' ); ?>>Bannière mobile horizontale (320×50)</option>
-					</optgroup>
-					<optgroup label="Bannières verticales (Sidebar)">
-						<option value="300x250" <?php selected( $dimensions, '300x250' ); ?>>Rectangle sidebar (300×250)</option>
-						<option value="300x600" <?php selected( $dimensions, '300x600' ); ?>>Grand rectangle sidebar (300×600)</option>
-						<option value="160x600" <?php selected( $dimensions, '160x600' ); ?>>Skyscraper sidebar (160×600)</option>
-						<option value="120x600" <?php selected( $dimensions, '120x600' ); ?>>Skyscraper étroit (120×600)</option>
-						<option value="250x250" <?php selected( $dimensions, '250x250' ); ?>>Carré sidebar (250×250)</option>
-						<option value="200x200" <?php selected( $dimensions, '200x200' ); ?>>Petit carré sidebar (200×200)</option>
-					</optgroup>
-					<optgroup label="Bannières intégrées (Dans les articles)">
-						<option value="336x280" <?php selected( $dimensions, '336x280' ); ?>>Rectangle intégré (336×280)</option>
-						<option value="300x250" <?php selected( $dimensions, '300x250' ); ?>>Rectangle article (300×250)</option>
-						<option value="580x400" <?php selected( $dimensions, '580x400' ); ?>>Bannière large intégrée (580×400)</option>
-						<option value="180x150" <?php selected( $dimensions, '180x150' ); ?>>Petit rectangle intégré (180×150)</option>
-					</optgroup>
-					<optgroup label="Bannières spéciales">
-						<option value="1200x630" <?php selected( $dimensions, '1200x630' ); ?>>Bannière réseaux sociaux (1200×630)</option>
-						<option value="1080x1080" <?php selected( $dimensions, '1080x1080' ); ?>>Carré Instagram (1080×1080)</option>
-						<option value="600x200" <?php selected( $dimensions, '600x200' ); ?>>Bannière email (600×200)</option>
-					</optgroup>
-					<optgroup label="Format personnalisé">
-						<option value="custom" <?php selected( $dimensions, 'custom' ); ?>>Dimensions personnalisées</option>
-					</optgroup>
-				</select>
-			</p>
+				<section class="mba-admin-section" id="mba-dimensions-section" style="<?php echo ( $type === 'html' ) ? 'display:none;' : ''; ?>">
+					<h3><?php esc_html_e( 'Format', 'mba-banner-manager' ); ?></h3>
+					<p><select name="mba_dimensions" id="mba_dimensions_select" style="width:100%;">
+						<?php $this->render_dimension_options( $dimensions ); ?>
+					</select></p>
+					<div id="mba-custom-dimensions" style="<?php echo ( $dimensions === 'custom' ) ? '' : 'display:none'; ?>">
+						<label><?php esc_html_e( 'Largeur (px)', 'mba-banner-manager' ); ?> <input type="number" name="mba_custom_width" value="<?php echo esc_attr( get_post_meta( $post->ID, '_mba_custom_width', true ) ); ?>" min="1" max="2000" style="width:100px;"></label>
+						<label style="margin-left:20px;"><?php esc_html_e( 'Hauteur (px)', 'mba-banner-manager' ); ?> <input type="number" name="mba_custom_height" value="<?php echo esc_attr( get_post_meta( $post->ID, '_mba_custom_height', true ) ); ?>" min="1" max="2000" style="width:100px;"></label>
+					</div>
+					<div id="mba-suggested-positions">
+						<strong><?php esc_html_e( 'Suggestions d’emplacements', 'mba-banner-manager' ); ?></strong>
+						<div id="mba-position-suggestions"><?php echo $this->get_position_suggestions( $dimensions ); ?></div>
+					</div>
+				</section>
 
-			<div id="mba-custom-dimensions" style="<?php echo ( $dimensions === 'custom' ) ? '' : 'display:none'; ?>">
-				<p>
-					<label>Largeur (px) : <input type="number" name="mba_custom_width" value="<?php echo esc_attr( get_post_meta( $post->ID, '_mba_custom_width', true ) ); ?>" min="1" max="2000" style="width:100px;"></label>
-					<label style="margin-left:20px;">Hauteur (px) : <input type="number" name="mba_custom_height" value="<?php echo esc_attr( get_post_meta( $post->ID, '_mba_custom_height', true ) ); ?>" min="1" max="2000" style="width:100px;"></label>
-				</p>
+				<section class="mba-admin-section">
+					<h3><?php esc_html_e( 'Placement', 'mba-banner-manager' ); ?></h3>
+					<div class="mba-field-grid mba-position-grid">
+						<?php foreach ( $this->get_position_options() as $slug => $label ) : ?>
+							<label><input type="checkbox" name="mba_positions[]" value="<?php echo esc_attr( $slug ); ?>" <?php checked( in_array( $slug, $positions, true ) ); ?>/> <?php echo esc_html( $label ); ?></label>
+						<?php endforeach; ?>
+					</div>
+					<p class="description mba-empty-state" id="mba-positions-empty" <?php echo $positions ? 'style="display:none;"' : ''; ?>><?php esc_html_e( 'Aucun emplacement sélectionné.', 'mba-banner-manager' ); ?></p>
+				</section>
+
+				<section class="mba-admin-section">
+					<h3><?php esc_html_e( 'Targeting', 'mba-banner-manager' ); ?></h3>
+					<div class="mba-field-grid">
+						<label><input type="radio" name="mba_device" value="desktop" <?php checked( $device, 'desktop' ); ?>/> <?php esc_html_e( 'Desktop', 'mba-banner-manager' ); ?></label>
+						<label><input type="radio" name="mba_device" value="mobile" <?php checked( $device, 'mobile' ); ?>/> <?php esc_html_e( 'Mobile', 'mba-banner-manager' ); ?></label>
+						<label><input type="radio" name="mba_device" value="both" <?php checked( $device, 'both' ); ?>/> <?php esc_html_e( 'Les 2', 'mba-banner-manager' ); ?></label>
+					</div>
+				</section>
 			</div>
 
-			<div id="mba-suggested-positions" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-left: 4px solid #0073aa;">
-				<strong>💡 Suggestions d'emplacements :</strong>
-				<div id="mba-position-suggestions">
-					<?php echo $this->get_position_suggestions( $dimensions ); ?>
+			<aside class="mba-admin-preview">
+				<div class="mba-preview-toolbar">
+					<strong><?php esc_html_e( 'Preview', 'mba-banner-manager' ); ?></strong>
+					<button type="button" class="button button-small mba-preview-mode is-active" data-mode="desktop"><?php esc_html_e( 'Desktop', 'mba-banner-manager' ); ?></button>
+					<button type="button" class="button button-small mba-preview-mode" data-mode="mobile"><?php esc_html_e( 'Mobile', 'mba-banner-manager' ); ?></button>
 				</div>
+					<div class="mba-preview-frame mba-preview-desktop" id="mba-live-preview">
+						<?php echo $this->render_preview_html( $type, $image_id, $html_code, $image_link ); ?>
+					</div>
+				</aside>
 			</div>
-		</div>
-
-		<hr>
-
-		<p><strong>Emplacements</strong></p>
-		<?php
-		$emplacements = [ 
-			'header' => 'En-tête du site', 
-			'footer' => 'Pied de page', 
-			'sidebar1' => 'Barre latérale principale', 
-			'sidebar2' => 'Barre latérale secondaire', 
-			'in_article' => 'Dans les articles', 
-			'in_listing' => 'Entre les articles (pages catégories)' 
-		];
-		foreach ( $emplacements as $slug => $label ) {
-			printf(
-				'<label style="margin-right:15px;"><input type="checkbox" name="mba_positions[]" value="%1$s" %2$s/> %3$s</label>',
-				esc_attr( $slug ),
-				checked( in_array( $slug, $positions ), true, false ),
-				esc_html( $label )
-			);
+			<?php
 		}
-		?>
 
-		<hr>
+		private function get_position_options() {
+			return [
+				'header'     => __( 'En-tête', 'mba-banner-manager' ),
+				'footer'     => __( 'Pied de page', 'mba-banner-manager' ),
+				'sidebar1'   => __( 'Sidebar 1', 'mba-banner-manager' ),
+				'sidebar2'   => __( 'Sidebar 2', 'mba-banner-manager' ),
+				'in_article' => __( 'Dans les articles', 'mba-banner-manager' ),
+				'in_listing' => __( 'Entre les articles', 'mba-banner-manager' ),
+			];
+		}
 
-		<p><strong>Appareil ciblé</strong><br>
-			<label><input type="radio" name="mba_device" value="desktop" <?php checked( $device, 'desktop' ); ?>/> Desktop</label>
-			<label><input type="radio" name="mba_device" value="mobile"  <?php checked( $device, 'mobile'  ); ?>/> Mobile</label>
-			<label><input type="radio" name="mba_device" value="both"    <?php checked( $device, 'both'    ); ?>/> Les 2</label>
-		</p>
-		<?php
-	}
+		private function get_dimension_options() {
+			return [
+				'' => [
+					'' => __( 'Sélectionner un format', 'mba-banner-manager' ),
+				],
+				__( 'Leaderboard', 'mba-banner-manager' ) => [
+					'728x90'  => '728 x 90',
+					'970x90'  => '970 x 90',
+					'970x250' => '970 x 250',
+					'468x60'  => '468 x 60',
+					'320x50'  => '320 x 50',
+				],
+				__( 'Sidebar', 'mba-banner-manager' ) => [
+					'300x250' => '300 x 250',
+					'300x600' => '300 x 600',
+					'160x600' => '160 x 600',
+					'120x600' => '120 x 600',
+					'250x250' => '250 x 250',
+					'200x200' => '200 x 200',
+				],
+				__( 'Contenu', 'mba-banner-manager' ) => [
+					'336x280' => '336 x 280',
+					'580x400' => '580 x 400',
+					'180x150' => '180 x 150',
+				],
+				__( 'Réseaux sociaux', 'mba-banner-manager' ) => [
+					'1200x630' => '1200 x 630',
+					'1080x1080' => '1080 x 1080',
+					'600x200'  => '600 x 200',
+				],
+				__( 'Avancé', 'mba-banner-manager' ) => [
+					'custom' => __( 'Format personnalisé', 'mba-banner-manager' ),
+				],
+			];
+		}
 
-	/* --------- 2. Sauvegarde --------- */
+		private function render_dimension_options( $selected ) {
+			foreach ( $this->get_dimension_options() as $group_label => $options ) {
+				if ( '' === $group_label ) {
+					foreach ( $options as $value => $label ) {
+						echo '<option value="' . esc_attr( $value ) . '" ' . selected( $selected, $value, false ) . '>' . esc_html( $label ) . '</option>';
+					}
+					continue;
+				}
+
+				echo '<optgroup label="' . esc_attr( $group_label ) . '">';
+				foreach ( $options as $value => $label ) {
+					echo '<option value="' . esc_attr( $value ) . '" ' . selected( $selected, $value, false ) . '>' . esc_html( $label ) . '</option>';
+				}
+				echo '</optgroup>';
+			}
+		}
+
+		private function render_preview_html( $type, $image_id, $html_code, $image_link = '' ) {
+			if ( 'html' === $type ) {
+				if ( empty( trim( (string) $html_code ) ) ) {
+					return '<div class="mba-preview-empty">' . esc_html__( 'Aucun code HTML à prévisualiser.', 'mba-banner-manager' ) . '</div>';
+				}
+
+				$preview = current_user_can( 'unfiltered_html' ) ? $html_code : wp_kses_post( $html_code );
+				return '<iframe class="mba-preview-iframe" sandbox="allow-popups allow-forms" srcdoc="' . esc_attr( $preview ) . '"></iframe>';
+			}
+
+			if ( ! $image_id ) {
+				return '<div class="mba-preview-empty">' . esc_html__( 'Aucune image sélectionnée.', 'mba-banner-manager' ) . '</div>';
+			}
+
+			$image = wp_get_attachment_image( $image_id, 'medium', false, [ 'class' => 'mba-preview-image' ] );
+			if ( ! $image ) {
+				return '<div class="mba-preview-empty">' . esc_html__( 'Image introuvable.', 'mba-banner-manager' ) . '</div>';
+			}
+
+			if ( $image_link ) {
+				return '<a href="' . esc_url( $image_link ) . '" target="_blank" rel="noopener noreferrer">' . $image . '</a>';
+			}
+
+			return $image;
+		}
+
+		private function get_configuration_warnings( $post_id ) {
+			$status     = get_post_meta( $post_id, '_mba_status', true ) ?: 'active';
+			$type       = get_post_meta( $post_id, '_mba_type', true ) ?: 'image';
+			$image_id   = absint( get_post_meta( $post_id, '_mba_image_id', true ) );
+			$image_link = get_post_meta( $post_id, '_mba_image_link', true );
+			$html_code  = get_post_meta( $post_id, '_mba_html', true );
+			$positions  = array_filter( (array) get_post_meta( $post_id, '_mba_positions', true ) );
+			$warnings   = [];
+
+			if ( 'active' !== $status ) {
+				return [];
+			}
+
+			if ( 'image' === $type ) {
+				if ( ! $image_id ) {
+					$warnings[] = __( 'Une bannière image active doit avoir une image.', 'mba-banner-manager' );
+				}
+				if ( ! $image_link ) {
+					$warnings[] = __( 'Une bannière image active doit avoir un lien cible.', 'mba-banner-manager' );
+				}
+			} elseif ( empty( trim( (string) $html_code ) ) ) {
+				$warnings[] = __( 'Une bannière HTML active doit avoir du code HTML/JS.', 'mba-banner-manager' );
+			}
+
+			if ( empty( $positions ) ) {
+				$warnings[] = __( 'Une bannière active doit avoir au moins un emplacement.', 'mba-banner-manager' );
+			}
+
+			return $warnings;
+		}
+
+		public function admin_notices() {
+			$screen = get_current_screen();
+			if ( ! $screen || 'mbabanners' !== $screen->post_type || 'post' !== $screen->base ) {
+				return;
+			}
+
+			if ( isset( $_GET['mba_duplicated'] ) && '1' === sanitize_key( wp_unslash( $_GET['mba_duplicated'] ) ) ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Bannière dupliquée en brouillon.', 'mba-banner-manager' ) . '</p></div>';
+			}
+
+			$post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0;
+			if ( ! $post_id ) {
+				return;
+			}
+
+			$warnings = $this->get_configuration_warnings( $post_id );
+			if ( ! $warnings ) {
+				return;
+			}
+
+			echo '<div class="notice notice-warning is-dismissible"><p><strong>' . esc_html__( 'Configuration de bannière incomplète.', 'mba-banner-manager' ) . '</strong></p><ul>';
+			foreach ( $warnings as $warning ) {
+				echo '<li>' . esc_html( $warning ) . '</li>';
+			}
+			echo '</ul></div>';
+		}
+
+		/* --------- 2. Sauvegarde --------- */
 	public function save( $post_id ) {
 		$nonce = isset( $_POST['mba_banner_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['mba_banner_nonce'] ) ) : '';
 		if ( ! wp_verify_nonce( $nonce, 'mba_save_banner' ) ) {
@@ -221,34 +351,124 @@ class MBA_Banners_Meta_Pro {
 
 	/* --------- 3. Assets admin --------- */
 	public function assets( $hook ) {
-		// Nous ne sommes intéressés que par les pages de bannières
 		$screen = get_current_screen();
 		if ( ! $screen || $screen->post_type !== 'mbabanners' ) {
 			return;
 		}
 
-		// Charger les scripts seulement sur la page d'édition
 		if ( $screen->base === 'post' ) {
+			wp_enqueue_media();
+			wp_enqueue_script( 'jquery' );
 
-		/* 1. scripts/feuilles de style cœur ----------------------------------- */
-		wp_enqueue_media();                 // charge tous les JS/CSS nécessaires
-		wp_enqueue_script( 'jquery' );
+			$script_path = MBA_BANNERS_PRO_PATH . 'admin/js/mba-banners-admin.js';
+			$script_url  = MBA_BANNERS_PRO_URL . 'admin/js/mba-banners-admin.js';
 
-		/* 2. votre script ----------------------------------------------------- */
-		$script_path = MBA_BANNERS_PRO_PATH . 'admin/js/mba-banners-admin.js';
-		$script_url = MBA_BANNERS_PRO_URL . 'admin/js/mba-banners-admin.js';
-		
-		wp_enqueue_script(
-			'mba-banners-admin',
-			$script_url,
-			[ 'jquery', 'media-views' ],    // 'media-views' suffit, pas besoin de 'media-grid'
-			file_exists( $script_path ) ? (string) filemtime( $script_path ) : MBA_BANNERS_PRO_VERSION,
-			true
-		);
+			wp_enqueue_script(
+				'mba-banners-admin',
+				$script_url,
+				[ 'jquery', 'media-views' ],
+				file_exists( $script_path ) ? (string) filemtime( $script_path ) : MBA_BANNERS_PRO_VERSION,
+				true
+			);
 		}
 
-		// Ajouter des styles CSS personnalisés (pour toutes les pages de bannières)
-		wp_add_inline_style( 'wp-admin', '
+		wp_register_style( 'mba-banners-admin', false, [], MBA_BANNERS_PRO_VERSION );
+		wp_enqueue_style( 'mba-banners-admin' );
+		wp_add_inline_style( 'mba-banners-admin', '
+			.mba-admin-layout {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) 320px;
+				gap: 20px;
+				align-items: start;
+			}
+			.mba-admin-main {
+				min-width: 0;
+			}
+			.mba-admin-section {
+				border: 1px solid #dcdcde;
+				background: #fff;
+				border-radius: 4px;
+				margin: 0 0 14px;
+				padding: 16px;
+			}
+			.mba-admin-section h3 {
+				margin: 0 0 12px;
+				font-size: 14px;
+				line-height: 1.4;
+			}
+			.mba-field-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+				gap: 8px 14px;
+			}
+			.mba-position-grid {
+				grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+			}
+			.mba-empty-state {
+				color: #b32d2e;
+				margin: 6px 0 0;
+			}
+			.mba-config-warning ul,
+			.notice ul {
+				list-style: disc;
+				margin-left: 20px;
+			}
+			.mba-admin-preview {
+				position: sticky;
+				top: 42px;
+				border: 1px solid #dcdcde;
+				background: #fff;
+				border-radius: 4px;
+				padding: 12px;
+			}
+			.mba-preview-toolbar {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				margin-bottom: 12px;
+			}
+			.mba-preview-toolbar strong {
+				margin-right: auto;
+			}
+			.mba-preview-mode.is-active {
+				border-color: #2271b1;
+				color: #0a4b78;
+			}
+			.mba-preview-frame {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 180px;
+				overflow: auto;
+				padding: 16px;
+				background: #f6f7f7;
+				border: 1px dashed #c3c4c7;
+				border-radius: 4px;
+			}
+			.mba-preview-mobile {
+				max-width: 180px;
+				min-height: 260px;
+				margin: 0 auto;
+			}
+			.mba-preview-image,
+			#mba-live-preview img {
+				display: block;
+				max-width: 100%;
+				height: auto;
+			}
+			.mba-preview-empty {
+				color: #646970;
+				text-align: center;
+			}
+			.mba-preview-html {
+				max-width: 100%;
+			}
+			.mba-preview-iframe {
+				width: 100%;
+				min-height: 220px;
+				border: 0;
+				background: #fff;
+			}
 			#mba-html-fields textarea {
 				background-color: #f8f9fa;
 				border: 1px solid #ddd;
@@ -300,6 +520,14 @@ class MBA_Banners_Meta_Pro {
 			}
 			.wp-list-table .column-type span {
 				font-weight: 500;
+			}
+			@media (max-width: 960px) {
+				.mba-admin-layout {
+					grid-template-columns: 1fr;
+				}
+				.mba-admin-preview {
+					position: static;
+				}
 			}
 		' );
 	}

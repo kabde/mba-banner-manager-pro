@@ -23,6 +23,11 @@ Plugin WordPress pour la gestion de bannières publicitaires avec ciblage par em
   - Auteur
   - Date de création
 - **Interface dynamique** : Champs qui s'adaptent selon le type de bannière
+- **Sections admin professionnelles** : Status, Creative, Format, Placement, Targeting
+- **Preview live** : aperçu desktop/mobile pour les bannières image et HTML
+- **Filtres de listing** : statut, type, appareil et emplacement
+- **Duplication rapide** : copie une bannière en brouillon avec ses métadonnées
+- **Notices de configuration** : alertes si une bannière active est incomplète
 - **Suggestions d'emplacements** basées sur le format choisi
 - **Aperçu des images** dans le listing
 
@@ -100,7 +105,22 @@ Pour toute question ou problème, consultez la documentation ou contactez le sup
 
 ## Version
 
-Version actuelle : 1.1.0
+Version actuelle : 1.2.0
+
+## Changelog
+
+### 1.2.0
+- Phase 1 roadmap: professional admin UI foundation.
+- Added grouped banner editor sections and sticky preview panel.
+- Added desktop/mobile preview toggle and live preview refresh.
+- Added incomplete-configuration notices and empty states.
+- Added list-table filters for status, type, device, and placement.
+- Added secure duplicate row action that creates a draft copy.
+
+### 1.1.0
+- Hardened multisite capabilities and activation behavior.
+- Added GitHub release updater.
+- Improved frontend/popup loading behavior and popup accessibility.
 
 ## Updates
 

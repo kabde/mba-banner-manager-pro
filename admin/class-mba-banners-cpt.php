@@ -12,6 +12,10 @@ class MBA_Banners_CPT_Pro {
 		add_filter( 'manage_mbabanners_posts_columns', [ $this, 'add_custom_columns' ] );
 		add_action( 'manage_mbabanners_posts_custom_column', [ $this, 'fill_custom_columns' ], 10, 2 );
 		add_filter( 'manage_edit-mbabanners_sortable_columns', [ $this, 'make_columns_sortable' ] );
+		add_action( 'restrict_manage_posts', [ $this, 'render_admin_filters' ] );
+		add_action( 'pre_get_posts', [ $this, 'apply_admin_filters' ] );
+		add_filter( 'post_row_actions', [ $this, 'add_duplicate_action' ], 10, 2 );
+		add_action( 'admin_action_mba_duplicate_banner', [ $this, 'duplicate_banner' ] );
 	}
 
 	public static function capabilities() {
@@ -168,5 +172,146 @@ class MBA_Banners_CPT_Pro {
 		$columns['positions'] = 'positions';
 		$columns['author'] = 'author';
 		return $columns;
+	}
+
+	public function render_admin_filters( $post_type ) {
+		if ( self::POST_TYPE !== $post_type ) {
+			return;
+		}
+
+		$filters = [
+			'mba_filter_status' => [
+				'label' => 'Tous les statuts',
+				'meta'  => '_mba_status',
+				'items' => [
+					'active'   => 'Actif',
+					'inactive' => 'Inactif',
+				],
+			],
+			'mba_filter_type' => [
+				'label' => 'Tous les types',
+				'meta'  => '_mba_type',
+				'items' => [
+					'image' => 'Image',
+					'html'  => 'HTML/JS',
+				],
+			],
+			'mba_filter_device' => [
+				'label' => 'Tous les appareils',
+				'meta'  => '_mba_device',
+				'items' => [
+					'desktop' => 'Desktop',
+					'mobile'  => 'Mobile',
+					'both'    => 'Les 2',
+				],
+			],
+			'mba_filter_position' => [
+				'label' => 'Tous les emplacements',
+				'meta'  => '_mba_positions',
+				'items' => [
+					'header'     => 'En-tête',
+					'footer'     => 'Pied de page',
+					'sidebar1'   => 'Sidebar 1',
+					'sidebar2'   => 'Sidebar 2',
+					'in_article' => 'Dans articles',
+					'in_listing' => 'Entre articles',
+				],
+			],
+		];
+
+		foreach ( $filters as $query_key => $filter ) {
+			$current = isset( $_GET[ $query_key ] ) ? sanitize_key( wp_unslash( $_GET[ $query_key ] ) ) : '';
+			echo '<select name="' . esc_attr( $query_key ) . '">';
+			echo '<option value="">' . esc_html( $filter['label'] ) . '</option>';
+			foreach ( $filter['items'] as $value => $label ) {
+				echo '<option value="' . esc_attr( $value ) . '" ' . selected( $current, $value, false ) . '>' . esc_html( $label ) . '</option>';
+			}
+			echo '</select>';
+		}
+	}
+
+	public function apply_admin_filters( $query ) {
+		if ( ! is_admin() || ! $query->is_main_query() || self::POST_TYPE !== $query->get( 'post_type' ) ) {
+			return;
+		}
+
+		$meta_query = (array) $query->get( 'meta_query' );
+
+		foreach ( [ 'mba_filter_status' => '_mba_status', 'mba_filter_type' => '_mba_type', 'mba_filter_device' => '_mba_device' ] as $query_key => $meta_key ) {
+			$value = isset( $_GET[ $query_key ] ) ? sanitize_key( wp_unslash( $_GET[ $query_key ] ) ) : '';
+			if ( $value ) {
+				$meta_query[] = [
+					'key'     => $meta_key,
+					'value'   => $value,
+					'compare' => '=',
+				];
+			}
+		}
+
+		$position = isset( $_GET['mba_filter_position'] ) ? sanitize_key( wp_unslash( $_GET['mba_filter_position'] ) ) : '';
+		if ( $position ) {
+			$meta_query[] = [
+				'key'     => '_mba_positions',
+				'value'   => '"' . $position . '"',
+				'compare' => 'LIKE',
+			];
+		}
+
+		if ( $meta_query ) {
+			$query->set( 'meta_query', $meta_query );
+		}
+	}
+
+	public function add_duplicate_action( $actions, $post ) {
+		if ( self::POST_TYPE !== $post->post_type || ! current_user_can( MBA_BANNERS_PRO_CAPABILITY ) ) {
+			return $actions;
+		}
+
+		$url = wp_nonce_url(
+			admin_url( 'admin.php?action=mba_duplicate_banner&post=' . absint( $post->ID ) ),
+			'mba_duplicate_banner_' . absint( $post->ID )
+		);
+
+		$actions['mba_duplicate'] = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'Dupliquer', 'mba-banner-manager' ) . '</a>';
+		return $actions;
+	}
+
+	public function duplicate_banner() {
+		$post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0;
+		$nonce   = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+		if ( ! $post_id || ! current_user_can( MBA_BANNERS_PRO_CAPABILITY ) || ! wp_verify_nonce( $nonce, 'mba_duplicate_banner_' . $post_id ) ) {
+			wp_die( esc_html__( 'Action non autorisée.', 'mba-banner-manager' ) );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post || self::POST_TYPE !== $post->post_type ) {
+			wp_die( esc_html__( 'Bannière introuvable.', 'mba-banner-manager' ) );
+		}
+
+		$new_id = wp_insert_post(
+			[
+				'post_type'   => self::POST_TYPE,
+				'post_status' => 'draft',
+				'post_title'  => sprintf( '%s (copie)', $post->post_title ),
+				'post_author' => get_current_user_id(),
+			],
+			true
+		);
+
+		if ( is_wp_error( $new_id ) ) {
+			wp_die( esc_html( $new_id->get_error_message() ) );
+		}
+
+		foreach ( get_post_meta( $post_id ) as $meta_key => $values ) {
+			if ( '_' !== substr( $meta_key, 0, 1 ) || '_edit_lock' === $meta_key || '_edit_last' === $meta_key ) {
+				continue;
+			}
+			foreach ( $values as $value ) {
+				add_post_meta( $new_id, $meta_key, maybe_unserialize( $value ) );
+			}
+		}
+
+		wp_safe_redirect( admin_url( 'post.php?action=edit&post=' . absint( $new_id ) . '&mba_duplicated=1' ) );
+		exit;
 	}
 }
