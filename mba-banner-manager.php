@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MBA Banner Manager Pro
  * Description: Gestion professionnelle des bannières image, HTML et popup avec ciblage par emplacement et appareil.
- * Version:     1.2.0
+ * Version:     1.2.1
  * Author:      Abderrahim KHALID
  * Text Domain: mba-banner-manager
  * Network:     true
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MBA_BANNERS_PRO_VERSION', '1.2.0' );
+define( 'MBA_BANNERS_PRO_VERSION', '1.2.1' );
 define( 'MBA_BANNERS_PRO_FILE', __FILE__ );
 define( 'MBA_BANNERS_PRO_BASENAME', plugin_basename( __FILE__ ) );
 define( 'MBA_BANNERS_PRO_PATH', plugin_dir_path( __FILE__ ) );

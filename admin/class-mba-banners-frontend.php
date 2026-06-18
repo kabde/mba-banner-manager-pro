@@ -123,7 +123,12 @@ class MBA_Banners_Frontend_Pro {
 	 * Récupérer les bannières pour un emplacement donné
 	 */
 	private function get_banners_for_location( $locations ) {
-		$locations = array_values( array_unique( array_map( 'sanitize_key', (array) $locations ) ) );
+		$allowed_locations = [ 'header', 'footer', 'sidebar1', 'sidebar2', 'in_article', 'in_listing' ];
+		$locations         = array_values( array_intersect( array_unique( array_map( 'sanitize_key', (array) $locations ) ), $allowed_locations ) );
+		if ( empty( $locations ) ) {
+			return [];
+		}
+
 		$device    = wp_is_mobile() ? 'mobile' : 'desktop';
 		$cache_key = $device . ':' . implode( ',', $locations );
 

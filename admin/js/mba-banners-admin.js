@@ -17,6 +17,19 @@ jQuery(function($) {
         return $('input[name="mba_type"]:checked').val() || 'image';
     }
 
+    function safePreviewUrl(value) {
+        if (!value) {
+            return '';
+        }
+
+        try {
+            var url = new URL(value, window.location.origin);
+            return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : '';
+        } catch (error) {
+            return '';
+        }
+    }
+
     function updateEmptyStates() {
         $('#mba-image-empty').toggle(!$('#mba_image_id').val());
         $('#mba-link-empty').toggle(!$('#mba_image_link').val());
@@ -44,7 +57,7 @@ jQuery(function($) {
     function imagePreviewHtml() {
         var imageId = $('#mba_image_id').val();
         var imageUrl = selectedImageUrl || $('#mba_image_preview img').first().attr('src') || '';
-        var link = $('#mba_image_link').val();
+        var link = safePreviewUrl($('#mba_image_link').val());
 
         if (!imageId || !imageUrl) {
             return '<div class="mba-preview-empty">Aucune image sélectionnée.</div>';
@@ -65,7 +78,7 @@ jQuery(function($) {
             return '<div class="mba-preview-empty">Aucun code HTML à prévisualiser.</div>';
         }
 
-        return '<iframe class="mba-preview-iframe" sandbox="allow-popups allow-forms" srcdoc="' + escapeAttr(html) + '"></iframe>';
+        return '<iframe class="mba-preview-iframe" sandbox="allow-scripts allow-popups allow-forms" srcdoc="' + escapeAttr(html) + '"></iframe>';
     }
 
     function updatePreview() {

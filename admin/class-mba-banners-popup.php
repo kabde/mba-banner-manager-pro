@@ -46,7 +46,7 @@ class MBA_Banners_Popup_Pro {
 			wp_enqueue_media();
 			$js_path = MBA_BANNERS_PRO_PATH . 'admin/js/mba-popup-admin.js';
 			$js_url = MBA_BANNERS_PRO_URL . 'admin/js/mba-popup-admin.js';
-			$js_ver = file_exists($js_path) ? filemtime($js_path) : time();
+			$js_ver = file_exists($js_path) ? filemtime($js_path) : MBA_BANNERS_PRO_VERSION;
 			wp_enqueue_script('mba-popup-admin', $js_url, [ 'jquery' ], $js_ver, true);
 		}
 	}
@@ -134,7 +134,7 @@ class MBA_Banners_Popup_Pro {
 			<div class="mba-popup-inner">
 				<button class="mba-popup-close" aria-label="Fermer">&times;</button>
 				<?php if ($link) : ?>
-					<a href="<?php echo $link; ?>" target="_blank" rel="nofollow sponsored noopener">
+					<a href="<?php echo esc_url( $link ); ?>" target="_blank" rel="nofollow sponsored noopener">
 						<?php echo $image_html; ?>
 					</a>
 				<?php else : ?>
@@ -153,12 +153,12 @@ class MBA_Banners_Popup_Pro {
 
 		$css_path = MBA_BANNERS_PRO_PATH . 'admin/css/mba-popup.css';
 		$css_url = MBA_BANNERS_PRO_URL . 'admin/css/mba-popup.css';
-		$css_ver = file_exists($css_path) ? filemtime($css_path) : time();
+		$css_ver = file_exists($css_path) ? filemtime($css_path) : MBA_BANNERS_PRO_VERSION;
 		wp_enqueue_style('mba-popup-style', $css_url, [], $css_ver);
 
 		$js_path = MBA_BANNERS_PRO_PATH . 'admin/js/mba-popup.js';
 		$js_url = MBA_BANNERS_PRO_URL . 'admin/js/mba-popup.js';
-		$js_ver = file_exists($js_path) ? filemtime($js_path) : time();
+		$js_ver = file_exists($js_path) ? filemtime($js_path) : MBA_BANNERS_PRO_VERSION;
 		wp_enqueue_script('mba-popup-script', $js_url, [ 'jquery' ], $js_ver, true);
 		wp_add_inline_script(
 			'mba-popup-script',

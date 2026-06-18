@@ -35,7 +35,7 @@ class MBA_Banners_Meta_Pro {
 		$type      = get_post_meta( $post->ID, '_mba_type',      true ) ?: 'image';
 		$image_id  = get_post_meta( $post->ID, '_mba_image_id',  true );
 		$html_code = get_post_meta( $post->ID, '_mba_html',      true );
-		$positions = (array) ( get_post_meta( $post->ID, '_mba_positions', true ) );
+		$positions = $this->normalize_positions( get_post_meta( $post->ID, '_mba_positions', true ) );
 		$device    = get_post_meta( $post->ID, '_mba_device',    true ) ?: 'both';
 		$dimensions = get_post_meta( $post->ID, '_mba_dimensions', true ) ?: '';
 		$status    = get_post_meta( $post->ID, '_mba_status',    true ) ?: 'active';
@@ -117,7 +117,7 @@ class MBA_Banners_Meta_Pro {
 							<label><input type="checkbox" name="mba_positions[]" value="<?php echo esc_attr( $slug ); ?>" <?php checked( in_array( $slug, $positions, true ) ); ?>/> <?php echo esc_html( $label ); ?></label>
 						<?php endforeach; ?>
 					</div>
-					<p class="description mba-empty-state" id="mba-positions-empty" <?php echo $positions ? 'style="display:none;"' : ''; ?>><?php esc_html_e( 'Aucun emplacement sélectionné.', 'mba-banner-manager' ); ?></p>
+					<p class="description mba-empty-state" id="mba-positions-empty" <?php echo ! empty( $positions ) ? 'style="display:none;"' : ''; ?>><?php esc_html_e( 'Aucun emplacement sélectionné.', 'mba-banner-manager' ); ?></p>
 				</section>
 
 				<section class="mba-admin-section">
@@ -136,10 +136,10 @@ class MBA_Banners_Meta_Pro {
 					<button type="button" class="button button-small mba-preview-mode is-active" data-mode="desktop"><?php esc_html_e( 'Desktop', 'mba-banner-manager' ); ?></button>
 					<button type="button" class="button button-small mba-preview-mode" data-mode="mobile"><?php esc_html_e( 'Mobile', 'mba-banner-manager' ); ?></button>
 				</div>
-					<div class="mba-preview-frame mba-preview-desktop" id="mba-live-preview">
-						<?php echo $this->render_preview_html( $type, $image_id, $html_code, $image_link ); ?>
-					</div>
-				</aside>
+				<div class="mba-preview-frame mba-preview-desktop" id="mba-live-preview">
+					<?php echo $this->render_preview_html( $type, $image_id, $html_code, $image_link ); ?>
+				</div>
+			</aside>
 			</div>
 			<?php
 		}
@@ -215,7 +215,7 @@ class MBA_Banners_Meta_Pro {
 				}
 
 				$preview = current_user_can( 'unfiltered_html' ) ? $html_code : wp_kses_post( $html_code );
-				return '<iframe class="mba-preview-iframe" sandbox="allow-popups allow-forms" srcdoc="' . esc_attr( $preview ) . '"></iframe>';
+				return '<iframe class="mba-preview-iframe" sandbox="allow-scripts allow-popups allow-forms" srcdoc="' . esc_attr( $preview ) . '"></iframe>';
 			}
 
 			if ( ! $image_id ) {
@@ -240,7 +240,7 @@ class MBA_Banners_Meta_Pro {
 			$image_id   = absint( get_post_meta( $post_id, '_mba_image_id', true ) );
 			$image_link = get_post_meta( $post_id, '_mba_image_link', true );
 			$html_code  = get_post_meta( $post_id, '_mba_html', true );
-			$positions  = array_filter( (array) get_post_meta( $post_id, '_mba_positions', true ) );
+			$positions  = $this->normalize_positions( get_post_meta( $post_id, '_mba_positions', true ) );
 			$warnings   = [];
 
 			if ( 'active' !== $status ) {
@@ -340,9 +340,7 @@ class MBA_Banners_Meta_Pro {
 			delete_post_meta( $post_id, '_mba_custom_height' );
 		}
 
-		$allowed_positions = [ 'header', 'footer', 'sidebar1', 'sidebar2', 'in_article', 'in_listing' ];
-		$positions = isset( $post_data['mba_positions'] ) ? array_map( 'sanitize_text_field', (array) $post_data['mba_positions'] ) : [];
-		$positions = array_values( array_intersect( $positions, $allowed_positions ) );
+		$positions = isset( $post_data['mba_positions'] ) ? $this->normalize_positions( $post_data['mba_positions'] ) : [];
 		update_post_meta( $post_id, '_mba_positions', $positions );
 
 		$device = isset( $post_data['mba_device'] ) && in_array( $post_data['mba_device'], [ 'desktop', 'mobile', 'both' ], true ) ? $post_data['mba_device'] : 'both';
@@ -584,5 +582,12 @@ class MBA_Banners_Meta_Pro {
 		}
 
 		return empty( $suggestions ) ? '<em>Aucune suggestion pour ce format</em>' : implode( '', $suggestions );
+	}
+
+	private function normalize_positions( $positions ) {
+		$allowed_positions = array_keys( $this->get_position_options() );
+		$positions         = array_map( 'sanitize_key', (array) $positions );
+
+		return array_values( array_intersect( array_filter( $positions ), $allowed_positions ) );
 	}
 }

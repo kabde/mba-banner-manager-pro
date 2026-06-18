@@ -105,9 +105,19 @@ Pour toute question ou problème, consultez la documentation ou contactez le sup
 
 ## Version
 
-Version actuelle : 1.2.0
+Version actuelle : 1.2.1
 
 ## Changelog
+
+### 1.2.1
+- Audit fix: normalize empty banner placements consistently in admin UI, warnings, and saves.
+- Audit fix: whitelist admin filter values before applying meta queries.
+- Audit fix: make status/type list-table sorting functional and remove misleading placement sorting.
+- Audit fix: require `edit_post` capability for duplicate row action and duplicate handler.
+- Audit fix: sandbox HTML/JS preview with script support but no same-origin access.
+- Audit fix: validate preview destination URLs client-side before making them clickable.
+- Audit fix: stabilize popup asset versions and escape popup links at output.
+- Audit fix: ignore unsupported frontend banner locations before querying.
 
 ### 1.2.0
 - Phase 1 roadmap: professional admin UI foundation.
