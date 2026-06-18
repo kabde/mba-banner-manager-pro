@@ -1,4 +1,8 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Classe pour gérer les métaboxes des bannières
  */
@@ -12,6 +16,10 @@ class MBA_Banners_Meta_Pro {
 
 	/* --------- 1. Métabox --------- */
 	public function add_boxes() {
+		if ( ! current_user_can( MBA_BANNERS_PRO_CAPABILITY ) ) {
+			return;
+		}
+
 		add_meta_box(
 			'mba_banner_details',
 			'Détails de la bannière',
@@ -161,7 +169,7 @@ class MBA_Banners_Meta_Pro {
 			return;
 		}
 		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-		if ( ! current_user_can( 'edit_post', $post_id ) ) return;
+		if ( ! current_user_can( MBA_BANNERS_PRO_CAPABILITY ) || ! current_user_can( 'edit_post', $post_id ) ) return;
 
 		$post_data = wp_unslash( $_POST );
 
@@ -230,21 +238,11 @@ class MBA_Banners_Meta_Pro {
 		$script_path = MBA_BANNERS_PRO_PATH . 'admin/js/mba-banners-admin.js';
 		$script_url = MBA_BANNERS_PRO_URL . 'admin/js/mba-banners-admin.js';
 		
-		// Cache buster intelligent basé sur la date de modification du fichier
-		if (file_exists($script_path)) {
-			$file_time = filemtime($script_path);
-			$cache_buster = '?v=' . $file_time;
-		} else {
-			$cache_buster = '?v=' . time(); // Fallback si le fichier n'existe pas
-		}
-		
-		$script_url .= $cache_buster;
-		
 		wp_enqueue_script(
 			'mba-banners-admin',
 			$script_url,
 			[ 'jquery', 'media-views' ],    // 'media-views' suffit, pas besoin de 'media-grid'
-			'1.0',
+			file_exists( $script_path ) ? (string) filemtime( $script_path ) : MBA_BANNERS_PRO_VERSION,
 			true
 		);
 		}

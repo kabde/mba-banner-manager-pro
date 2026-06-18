@@ -5,7 +5,7 @@
 Le plugin affiche automatiquement les bannières selon leurs emplacements configurés :
 
 ### Emplacements automatiques
-- **Header** : Affiché dans `<head>` ou début du `<body>`
+- **Header** : Affiché au début du `<body>` via `wp_body_open`, avec fallback propre en footer pour les anciens thèmes
 - **Footer** : Affiché dans `<footer>` ou fin du `<body>`
 - **Sidebars** : Affiché dans les barres latérales
 - **Dans les articles** : Inséré après le premier paragraphe des articles
@@ -96,6 +96,7 @@ Plus de contenu...
 
 ### Optimisations
 - Chargement conditionnel des assets
+- Cache par requête pour éviter les requêtes répétées sur une même page
 - Détection automatique du device
 
 ## 🔧 Dépannage
@@ -128,11 +129,3 @@ Le plugin est entièrement responsive :
 3. **Limitez le nombre** : Évitez trop de bannières sur une même page
 4. **Respectez les formats** : Utilisez les formats standards pour de meilleurs résultats
 5. **Testez les liens** : Vérifiez que les liens ciblés fonctionnent
-
-## 🔄 Mise à jour du cache
-
-Le cache se vide automatiquement, mais vous pouvez le forcer :
-```php
-// Vider tous les caches de bannières
-delete_transient('mba_banners_*');
-``` 

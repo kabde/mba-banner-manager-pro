@@ -1,12 +1,41 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class MBA_Banners_CPT_Pro {
+
+	const POST_TYPE = 'mbabanners';
 
 	public function __construct() {
 		add_action( 'init', [ $this, 'register_post_type' ] );
-		add_action( 'admin_menu', [ $this, 'add_admin_menu' ] );
 		add_filter( 'manage_mbabanners_posts_columns', [ $this, 'add_custom_columns' ] );
 		add_action( 'manage_mbabanners_posts_custom_column', [ $this, 'fill_custom_columns' ], 10, 2 );
 		add_filter( 'manage_edit-mbabanners_sortable_columns', [ $this, 'make_columns_sortable' ] );
+	}
+
+	public static function capabilities() {
+		return [
+			'edit_post'              => MBA_BANNERS_PRO_CAPABILITY,
+			'read_post'              => MBA_BANNERS_PRO_CAPABILITY,
+			'delete_post'            => MBA_BANNERS_PRO_CAPABILITY,
+			'edit_posts'             => MBA_BANNERS_PRO_CAPABILITY,
+			'edit_others_posts'      => MBA_BANNERS_PRO_CAPABILITY,
+			'publish_posts'          => MBA_BANNERS_PRO_CAPABILITY,
+			'read_private_posts'     => MBA_BANNERS_PRO_CAPABILITY,
+			'delete_posts'           => MBA_BANNERS_PRO_CAPABILITY,
+			'delete_private_posts'   => MBA_BANNERS_PRO_CAPABILITY,
+			'delete_published_posts' => MBA_BANNERS_PRO_CAPABILITY,
+			'delete_others_posts'    => MBA_BANNERS_PRO_CAPABILITY,
+			'edit_private_posts'     => MBA_BANNERS_PRO_CAPABILITY,
+			'edit_published_posts'   => MBA_BANNERS_PRO_CAPABILITY,
+			'create_posts'           => MBA_BANNERS_PRO_CAPABILITY,
+		];
+	}
+
+	public static function register() {
+		$instance = new self();
+		$instance->register_post_type();
 	}
 
 	/* --------- 1. Enregistrement du CPT --------- */
@@ -39,18 +68,14 @@ class MBA_Banners_CPT_Pro {
 			'has_archive'         => false,
 			'exclude_from_search' => true,
 			'publicly_queryable'  => false,
-			'capability_type'     => 'post',
+			'capability_type'     => [ 'mba_banner', 'mba_banners' ],
+			'capabilities'        => self::capabilities(),
+			'map_meta_cap'        => false,
 			'supports'            => [ 'title' ],
 			'rewrite'             => false,
 		];
 
-		register_post_type( 'mbabanners', $args );
-	}
-
-	/* --------- 2. Menu admin --------- */
-	public function add_admin_menu() {
-		// Le menu est automatiquement créé par register_post_type
-		// Mais on peut ajouter des sous-menus si nécessaire
+		register_post_type( self::POST_TYPE, $args );
 	}
 
 	/* --------- 3. Colonnes personnalisées --------- */

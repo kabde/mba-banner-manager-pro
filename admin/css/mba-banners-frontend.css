@@ -140,6 +140,12 @@
 	animation: mba-fade-in 0.5s ease-out;
 }
 
+@media (prefers-reduced-motion: reduce) {
+	.mba-banner {
+		animation: none;
+	}
+}
+
 /* Support pour les thèmes sombres */
 @media (prefers-color-scheme: dark) {
 	.mba-listing-banners {
@@ -152,4 +158,4 @@
 	.mba-footer-banners {
 		border-color: #444;
 	}
-} 
+}

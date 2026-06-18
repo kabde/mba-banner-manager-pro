@@ -31,6 +31,7 @@ Plugin WordPress pour la gestion de bannières publicitaires avec ciblage par em
 - **Ciblage intelligent** par appareil (desktop/mobile)
 - **Shortcode manuel** : `[mba_banner location="header"]`
 - **Responsive design** adapté à tous les écrans
+- **Mises à jour GitHub** via les releases du dépôt public.
 
 ## Installation
 
@@ -61,6 +62,7 @@ Plugin WordPress pour la gestion de bannières publicitaires avec ciblage par em
 - Insérez votre code HTML, JavaScript ou bannière publicitaire
 - Le code sera inséré tel quel dans votre site
 - Compatible avec Google AdSense, bannières publicitaires, etc.
+- Pour des raisons de sécurité, l'édition HTML/JS doit rester réservée aux administrateurs de confiance.
 
 ### Emplacements disponibles
 - **En-tête du site** : Affichage en haut de page
@@ -98,4 +100,16 @@ Pour toute question ou problème, consultez la documentation ou contactez le sup
 
 ## Version
 
-Version actuelle : 1.0 
+Version actuelle : 1.1.0
+
+## Updates
+
+The plugin checks GitHub releases from:
+
+`https://github.com/kabde/mba-banner-manager-pro`
+
+Each release must include a WordPress-ready ZIP asset named:
+
+`mba-banner-manager-pro.zip`
+
+The ZIP must contain the `mba-banner-manager/` plugin directory at its root.

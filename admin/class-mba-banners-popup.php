@@ -1,4 +1,8 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class MBA_Banners_Popup_Pro {
 
 	const OPTION_KEY = 'mba_banner_popup_options';
@@ -15,17 +19,25 @@ class MBA_Banners_Popup_Pro {
 
 	public function add_admin_menu() {
 		add_submenu_page(
-			'edit.php?post_type=mbabanners',
-			'Popup Bannière',
-			'Popup Bannière',
-			'manage_options',
-			'mba-banner-popup',
-			[ $this, 'render_admin_page' ]
-		);
+				'edit.php?post_type=mbabanners',
+				'Popup Bannière',
+				'Popup Bannière',
+				MBA_BANNERS_PRO_CAPABILITY,
+				'mba-banner-popup',
+				[ $this, 'render_admin_page' ]
+			);
 	}
 
 	public function register_settings() {
-		register_setting('mba_banner_popup_group', self::OPTION_KEY, [ $this, 'sanitize_options' ]);
+		register_setting(
+			'mba_banner_popup_group',
+			self::OPTION_KEY,
+			[
+				'type'              => 'array',
+				'sanitize_callback' => [ $this, 'sanitize_options' ],
+				'default'           => $this->default_options(),
+			]
+		);
 	}
 
 	public function admin_assets($hook) {
@@ -61,11 +73,11 @@ class MBA_Banners_Popup_Pro {
 	}
 
 	public function render_admin_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( MBA_BANNERS_PRO_CAPABILITY ) ) {
 			wp_die( esc_html__( 'Vous n’avez pas les permissions nécessaires.', 'mba-banner-manager' ) );
 		}
 
-		$options = wp_parse_args( get_option(self::OPTION_KEY, []), $this->default_options() );
+		$options = $this->get_options();
 		?>
 		<div class="wrap">
 			<h1>Popup Bannière</h1>
@@ -106,16 +118,19 @@ class MBA_Banners_Popup_Pro {
 	}
 
 	public function display_popup() {
-		$options = wp_parse_args( get_option(self::OPTION_KEY, []), $this->default_options() );
+		$options = $this->get_options();
 		if (empty($options['enabled']) || empty($options['image_id'])) return;
 		$image_html = wp_get_attachment_image($options['image_id'], 'full', false, [
 			'alt' => esc_attr($options['alt'] ?? ''),
 			'class' => 'mba-popup-img',
 		]);
+		if ( ! $image_html ) {
+			return;
+		}
+
 		$link = !empty($options['link']) ? esc_url($options['link']) : '';
-		$delay = isset($options['delay']) ? intval($options['delay']) : 2;
 		?>
-		<div id="mba-popup-banner" class="mba-popup-banner" style="display:none;">
+		<div id="mba-popup-banner" class="mba-popup-banner" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
 			<div class="mba-popup-inner">
 				<button class="mba-popup-close" aria-label="Fermer">&times;</button>
 				<?php if ($link) : ?>
@@ -127,11 +142,15 @@ class MBA_Banners_Popup_Pro {
 				<?php endif; ?>
 			</div>
 		</div>
-		<script>window.mbaPopupDelay = <?php echo $delay; ?>;</script>
 		<?php
 	}
 
 	public function frontend_assets() {
+		$options = $this->get_options();
+		if ( empty( $options['enabled'] ) || empty( $options['image_id'] ) ) {
+			return;
+		}
+
 		$css_path = MBA_BANNERS_PRO_PATH . 'admin/css/mba-popup.css';
 		$css_url = MBA_BANNERS_PRO_URL . 'admin/css/mba-popup.css';
 		$css_ver = file_exists($css_path) ? filemtime($css_path) : time();
@@ -141,5 +160,14 @@ class MBA_Banners_Popup_Pro {
 		$js_url = MBA_BANNERS_PRO_URL . 'admin/js/mba-popup.js';
 		$js_ver = file_exists($js_path) ? filemtime($js_path) : time();
 		wp_enqueue_script('mba-popup-script', $js_url, [ 'jquery' ], $js_ver, true);
+		wp_add_inline_script(
+			'mba-popup-script',
+			'window.mbaPopupDelay = ' . wp_json_encode( absint( $options['delay'] ) ) . ';',
+			'before'
+		);
 	}
-} 
+
+	private function get_options() {
+		return wp_parse_args( get_option( self::OPTION_KEY, [] ), $this->default_options() );
+	}
+}

@@ -1,14 +1,18 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Classe pour gérer l'affichage des bannières sur le frontend
  */
 class MBA_Banners_Frontend_Pro {
 
+	private $banner_cache = [];
+
 	public function __construct() {
-		// Afficher la bannière header à la fin du header (wp_body_open) ET en fallback sur wp_head
 		add_action( 'wp_body_open', [ $this, 'display_header_banners' ] );
-		add_action( 'wp_head', [ $this, 'display_header_banners_fallback' ] );
-		// Afficher la bannière footer juste avant le footer (get_footer)
+		add_action( 'wp_footer', [ $this, 'display_header_banners_fallback' ], 1 );
 		add_action( 'get_footer', [ $this, 'display_footer_banners' ] );
 		add_action( 'get_sidebar', [ $this, 'display_sidebar_banners' ] );
 		add_action( 'the_content', [ $this, 'display_in_article_banners' ] );
@@ -119,37 +123,53 @@ class MBA_Banners_Frontend_Pro {
 	 * Récupérer les bannières pour un emplacement donné
 	 */
 	private function get_banners_for_location( $locations ) {
-		$locations = (array) $locations;
-		$device = wp_is_mobile() ? 'mobile' : 'desktop';
+		$locations = array_values( array_unique( array_map( 'sanitize_key', (array) $locations ) ) );
+		$device    = wp_is_mobile() ? 'mobile' : 'desktop';
+		$cache_key = $device . ':' . implode( ',', $locations );
 
-		// Récupérer toutes les bannières actives et device compatible
+		if ( isset( $this->banner_cache[ $cache_key ] ) ) {
+			return $this->banner_cache[ $cache_key ];
+		}
+
+		$location_query = [ 'relation' => 'OR' ];
+		foreach ( $locations as $location ) {
+			$location_query[] = [
+				'key'     => '_mba_positions',
+				'value'   => '"' . $location . '"',
+				'compare' => 'LIKE',
+			];
+		}
+
 		$banners = get_posts([
-			'post_type' => 'mbabanners',
-			'post_status' => 'publish',
+			'post_type'      => MBA_Banners_CPT_Pro::POST_TYPE,
+			'post_status'    => 'publish',
 			'posts_per_page' => -1,
-			'meta_query' => [
+			'no_found_rows'  => true,
+			'orderby'        => 'menu_order date',
+			'order'          => 'DESC',
+			'meta_query'     => [
 				[
-					'key' => '_mba_status',
-					'value' => 'active',
+					'key'     => '_mba_status',
+					'value'   => 'active',
 					'compare' => '='
 				],
 				[
 					'relation' => 'OR',
 					[
-						'key' => '_mba_device',
-						'value' => 'both',
+						'key'     => '_mba_device',
+						'value'   => 'both',
 						'compare' => '='
 					],
 					[
-						'key' => '_mba_device',
-						'value' => $device,
+						'key'     => '_mba_device',
+						'value'   => $device,
 						'compare' => '='
 					]
-				]
+				],
+				$location_query,
 			]
 		]);
 
-		// Filtrer en PHP sur les emplacements
 		$filtered = [];
 		foreach ($banners as $banner) {
 			$positions = get_post_meta($banner->ID, '_mba_positions', true);
@@ -157,6 +177,8 @@ class MBA_Banners_Frontend_Pro {
 				$filtered[] = $banner;
 			}
 		}
+
+		$this->banner_cache[ $cache_key ] = $filtered;
 		return $filtered;
 	}
 
@@ -165,7 +187,7 @@ class MBA_Banners_Frontend_Pro {
 	 */
 	private function render_banner( $banner ) {
 		$type = get_post_meta( $banner->ID, '_mba_type', true );
-		$dimensions = get_post_meta( $banner->ID, '_mba_dimensions', true );
+		$type = in_array( $type, [ 'image', 'html' ], true ) ? $type : 'image';
 		$html = '<div class="mba-banner mba-banner-' . esc_attr( $type ) . '" data-banner-id="' . esc_attr( $banner->ID ) . '">';
 		if ( $type === 'image' ) {
 			$html .= $this->render_image_banner( $banner );
@@ -196,8 +218,9 @@ class MBA_Banners_Frontend_Pro {
 		if ( $dimensions === 'custom' ) {
 			$width = get_post_meta( $banner->ID, '_mba_custom_width', true );
 			$height = get_post_meta( $banner->ID, '_mba_custom_height', true );
-		} elseif ( ! empty( $dimensions ) ) {
-			list( $width, $height ) = explode( 'x', $dimensions );
+		} elseif ( preg_match( '/^([0-9]{2,4})x([0-9]{2,4})$/', $dimensions, $matches ) ) {
+			$width  = $matches[1];
+			$height = $matches[2];
 		}
 
 		if ( $width && $height ) {
@@ -287,7 +310,7 @@ class MBA_Banners_Frontend_Pro {
 	 * Afficher le debug global
 	 */
 	public function display_global_debug() {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( MBA_BANNERS_PRO_CAPABILITY ) ) {
 			return;
 		}
 
@@ -326,6 +349,10 @@ class MBA_Banners_Frontend_Pro {
 	 * Charger les assets CSS/JS
 	 */
 	public function enqueue_assets() {
+		if ( ! $this->has_frontend_banners() ) {
+			return;
+		}
+
 		wp_enqueue_style(
 			'mba-banners-frontend',
 			MBA_BANNERS_PRO_URL . 'admin/css/mba-banners-frontend.css',
@@ -334,14 +361,22 @@ class MBA_Banners_Frontend_Pro {
 		);
 	}
 
+	private function has_frontend_banners() {
+		foreach ( [ 'header', 'footer', 'sidebar1', 'sidebar2', 'in_article', 'in_listing' ] as $location ) {
+			if ( ! empty( $this->get_banners_for_location( $location ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	/**
-	 * Afficher la bannière header uniquement si elle n'a pas déjà été affichée (évite le doublon)
+	 * Fallback pour les thèmes sans wp_body_open, sans injecter de HTML dans wp_head.
 	 */
 	public function display_header_banners_fallback() {
-		static $already_displayed = false;
-		if ( ! $already_displayed ) {
+		if ( ! did_action( 'wp_body_open' ) ) {
 			$this->display_header_banners();
-			$already_displayed = true;
 		}
 	}
-} 
+}
